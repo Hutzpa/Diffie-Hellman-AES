@@ -1,45 +1,61 @@
-const app = require('express')();
-const express = require('express');
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
-const NodeRsa = require('node-rsa');
-const Key = new NodeRsa({b:2048});
+const app = require("express")();
+const express = require("express");
+const http = require("http").createServer(app);
+const io = require("socket.io")(http);
+const crypto = require("crypto");
 
-const Encryptor = require('./src/Encryptor.js');
+const NumberGenerator = require("./src/NumberGenerator");
+const Encryptor = require("./src/Encryptor");
 
+app.use("/static", express.static("./static/"));
+app.get("/", (req, res) => res.sendFile(__dirname + "/static/client.html"));
+http.listen(3000, () => console.log("Listening 3000"));
 
-app.use("/static",express.static("./static/"));
-app.get('/',(req,res) => res.sendFile(__dirname + '/static/client.html'));
-http.listen(3000,() => console.log('Listening 3000')) ;
+let a = NumberGenerator.randomInteger(Number.MAX_VALUE / 10, 1.554835843e250);
+let p = NumberGenerator.GetSimple();
+let g = (p-1)/2;
+let A = (g ^ a) % p;
+let iv = crypto.randomBytes(8).toString('hex');
 
-const privateServerKey = Key.exportKey('private');
-const publicServerKey = Key.exportKey('public');
+let Key;
+//let ValidKey;
+let Apg = {
+  A: A,
+  p: p,
+  g: g,
+  iv: iv
+};
 
-let users = [];
+console.log(Apg);
 
-io.on('connection', socket =>{
-    console.log(`${socket.client.id} has been connected`) //лог подключения
-    socket.on('greetingToServ', loggedUsers => {  //Обмен ключами между клиентом и сервером
-        users.push({
-            id:socket.client.id,
-            publicKey:loggedUsers.publicKey,
-        });
-        socket.emit('greetingToClient', publicServerKey);
-        // console.log('Пользователи');
-        // console.log(users);
+io.on("connection", socket => {
+  console.log(`${socket.client.id} has been connected`); //лог подключения
+
+  socket.on("greetingToServ", () => {
+    //Обмен ключами между клиентом и сервером
+    socket.emit("greetingToClient", Apg);
+  });
+  socket.on("sayBack", B => {
+    Key = (B ^ a) % p;
+    //ValidKey = NumberGenerator.MakeValidKey(Key);  
+    console.log(`KEY ${Key}`);
+  });
+
+  socket.on("chat mes", Message => {
+    console.log(Message);
+    socket.broadcast.emit("chat message", {
+      name: Message.name,
+      msg: Message.msg
     });
+    // users.forEach(item => {
+    //   socket.broadcast
+    //     .to(item.id)
+    //     .emit("chat message", { name: Message.name, msg: decMes });
+    // });
+  });
 
-    socket.on('chat mes', Message =>{
-        let decMes = Encryptor.decrypt(Message.msg,privateServerKey);
-        users.forEach(item => {
-            socket.broadcast.to(item.id).emit('chat message',{name:Message.name, msg: Encryptor.encrypt(decMes,item.publicKey) });
-        });        
-    });
-
-
-    socket.on('disconnect',() =>{
-        console.log(`${socket.client.id} disconnected`);
-        users.splice(users.indexOf(users.find(item => item.id === socket.client.id)),1);
-        // console.log(users);
-    } ); //лог отключения
+  socket.on("disconnect", () => {
+    console.log(`${socket.client.id} disconnected`);
+    // users.splice(users.indexOf(users.find(item => item.id === socket.client.id)),1);
+  }); //лог отключения
 });

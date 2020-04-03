@@ -4,10 +4,10 @@
   "description": "",
   "main": "Server.js",
   "dependencies": {
+    "crypto": "^1.0.1",
     "express": "^4.17.1",
     "jquery": "^3.4.1",
     "mongoose": "^5.9.5",
-    "node-rsa": "^1.0.7",
     "socket.io": "^2.3.0",
     "underscore": "^1.9.2",
     "ws": "^7.2.3"
