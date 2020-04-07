@@ -1,3 +1,4 @@
+"use strict";
 const app = require("express")();
 const express = require("express");
 const http = require("http").createServer(app);
@@ -7,55 +8,62 @@ const crypto = require("crypto");
 const NumberGenerator = require("./src/NumberGenerator");
 const Encryptor = require("./src/Encryptor");
 
+
 app.use("/static", express.static("./static/"));
 app.get("/", (req, res) => res.sendFile(__dirname + "/static/client.html"));
 http.listen(3000, () => console.log("Listening 3000"));
 
-let a = NumberGenerator.randomInteger(Number.MAX_VALUE / 10, 1.554835843e250);
-let p = NumberGenerator.GetSimple();
-let g = (p-1)/2;
-let A = (g ^ a) % p;
-let iv = crypto.randomBytes(8).toString('hex');
-
+//Комментарии по методичке БПтД
+let Q = NumberGenerator.GetSimple(); 
+let A = NumberGenerator.Proot(Q) //Примитивный корень
+// let Q = 13;
+// let A = 2;
+let Xb = NumberGenerator.randomInteger(1, Q);
+let Yb = (A**Xb)%Q;
 let Key;
-//let ValidKey;
-let Apg = {
-  A: A,
-  p: p,
-  g: g,
-  iv: iv
-};
 
+let iv = crypto.randomBytes(8).toString("hex");
+
+let Apg = {
+  A:A,
+  Q:Q,
+  Yb: Yb,
+  iv: iv,
+};
 console.log(Apg);
 
-io.on("connection", socket => {
-  console.log(`${socket.client.id} has been connected`); //лог подключения
+let users = [];
 
+io.on("connection", (socket) => {
+  console.log(`${socket.client.id} has been connected`); //лог подключения
   socket.on("greetingToServ", () => {
+
     //Обмен ключами между клиентом и сервером
     socket.emit("greetingToClient", Apg);
   });
-  socket.on("sayBack", B => {
-    Key = (B ^ a) % p;
-    //ValidKey = NumberGenerator.MakeValidKey(Key);  
-    console.log(`KEY ${Key}`);
+
+  socket.on("sayBack", (Yc) => {
+    Key = (Yc**Xb)%Q;
+    console.log(`KEY =  ${Key}`);
+    users.push({id: socket.client.id,key:Key, validKey:NumberGenerator.MakeValidKey(Key)});
+
+    console.log(users);
   });
 
-  socket.on("chat mes", Message => {
+  socket.on("chat mes", (Message) => {
+    let decMes = Encryptor.decrypt(Message.msg,users.find(item => item.id === socket.client.id).validKey,iv);
     console.log(Message);
-    socket.broadcast.emit("chat message", {
-      name: Message.name,
-      msg: Message.msg
-    });
-    // users.forEach(item => {
-    //   socket.broadcast
-    //     .to(item.id)
-    //     .emit("chat message", { name: Message.name, msg: decMes });
+    users.forEach(item => {
+      socket.broadcast.to(item.id).emit('chat message',{name:Message.name, msg: Encryptor.encrypt(decMes,item.validKey,iv) });
+  });  
+    // socket.emit("chat message", {
+    //   name: Message.name,
+    //   msg: Message.msg,
     // });
   });
 
   socket.on("disconnect", () => {
     console.log(`${socket.client.id} disconnected`);
-    // users.splice(users.indexOf(users.find(item => item.id === socket.client.id)),1);
+     users.splice(users.indexOf(users.find(item => item.id === socket.client.id)),1);
   }); //лог отключения
 });

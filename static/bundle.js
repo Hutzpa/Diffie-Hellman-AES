@@ -33037,22 +33037,21 @@ exports.createContext = Script.createContext = function (context) {
 };
 
 },{}],155:[function(require,module,exports){
-const crypto = require('crypto');
+const crypto = require("crypto");
 
+function encrypt(string, key, iv) {
+  let cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  let encrypted = cipher.update(string, "utf-8", "hex");
+  encrypted += cipher.final("hex");
 
-function encrypt(string,key ,iv) {
-    let cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    let encrypted = cipher.update(string, 'utf-8', 'hex');
-    encrypted += cipher.final('hex');
-    
   return encrypted;
 }
 
-function decrypt(string, key,iv) {
-  console.log(`iv - ${iv} | length - ${iv.length}`)
-    let decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-    let decrypted = decipher.update(string, 'hex', 'utf-8');
-    decrypted += decipher.final('utf-8');
+function decrypt(string, key, iv) {
+  //console.log(`iv - ${iv} | length - ${iv.length}`);
+  let decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+  let decrypted = decipher.update(string, "hex", "utf-8");
+  decrypted += decipher.final("utf-8");
   return decrypted;
 }
 
@@ -33067,57 +33066,106 @@ function randomInteger(min, max) {
   return Math.round(rand);
 }
 
-function GetSimple(){ 
-    var nums = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199];
-    return nums[randomInteger(0,nums.length)];
+function GetSimple() {
+  var nums = [
+    2, 3, 5, 7,
+    11,
+    13,
+    17,
+    19,
+    23,
+    // 29,
+    // 31,
+    // 37,
+    // 41,
+    // 43,
+    // 47,
+    // 53
+  ];
+  return nums[randomInteger(0, nums.length)];
 }
 
-function MakeValidKey(invalidKey){
-   let validKey ="";
-    while(validKey.length != 32)
-        validKey += invalidKey;
+function MakeValidKey(invalidKey) {
+  let validKey = "";
+  while (validKey.length != 32) validKey += invalidKey;
 
-    return validKey;
+  return validKey;
+}
+
+// function Proot(To){
+//   let roots = [{si:2 ,proot:1 },{si:3 ,proot:2 },{si: 5,proot:7 },
+//     {si:7 ,proot: 3},{si:11 ,proot:2 },{si:13 ,proot:2 },
+//     {si:17 ,proot:3 },{si:19 ,proot:2 },{si:23 ,proot:5 },
+//     {si:29 ,proot:2 },{si:31 ,proot:3 },{si:37 ,proot:2 },
+//     {si:41,proot:6 },{si:43 ,proot:3 },{si:47 ,proot:5 },{si:53,proot:2 }];
+
+//     return(roots.find(item => item.si == To).proot);
+
+// }
+
+function Proot(To) {
+  for (let i = 0; i < To; i++) if (IsPRoot(To, i)) return i;
+  return 0;
+}
+
+function IsPRoot(p, a) {
+  if (a == 0 || a == 1) return false;
+  let last = 1;
+
+  let set = [];
+  for (let i = 0; i < p - 1; i++) {
+    last = (last * a) % p;
+    if (set.includes(last))
+      // Если повтор
+      return false;
+    set.push(last);
+  }
+  return true;
 }
 
 module.exports.randomInteger = randomInteger;
 module.exports.GetSimple = GetSimple;
 module.exports.MakeValidKey = MakeValidKey;
+module.exports.Proot = Proot;
 
 },{}],157:[function(require,module,exports){
+"use strict";
 var $ = require("jquery");
 var socket = io();
 const NumberGenerator = require("./NumberGenerator");
 const Encryptor = require("./Encryptor");
 
 // source https://ru.wikipedia.org/wiki/%D0%9F%D1%80%D0%BE%D1%82%D0%BE%D0%BA%D0%BE%D0%BB_%D0%94%D0%B8%D1%84%D1%84%D0%B8_%E2%80%94_%D0%A5%D0%B5%D0%BB%D0%BB%D0%BC%D0%B0%D0%BD%D0%B0
-let b = NumberGenerator.randomInteger(Number.MAX_VALUE / 10, 1.554835843e250);
-let B;
+let Xc;
+let Yc;
 let Key;
 let ValidKey;
 let iv;
 
-
-
 socket.emit("greetingToServ");
-socket.on("greetingToClient", Apg => {
-  console.log(Apg);
-  B = (Apg.g ^ b) % Apg.p;
-  Key = (Apg.A ^ b) % Apg.p;
-  iv = Apg.iv;
-  socket.emit("sayBack", B);
-  
-  console.log(`KEY ${Key}`);
-  ValidKey = NumberGenerator.MakeValidKey(Key);
-  console.log(`Valid Key ${ValidKey}`);
 
+socket.on("greetingToClient", (Apg) => {
+  console.log(Apg);
+  
+  Xc = NumberGenerator.randomInteger(0,Apg.Q);//Закрытый ключ
+  Yc = (Apg.A**Xc)%Apg.Q; //Открытый ключ
+
+  Key = (Apg.Yb**Xc)%Apg.Q; //Закрытый ключ
+  console.log(`Key = ${Key}`);
+
+  iv = Apg.iv;//iv для шифровалки
+  ValidKey = NumberGenerator.MakeValidKey(Key); //Получение валидного ключа для Aes шифровалкиж
+  
+
+  socket.emit("sayBack",Yc);
+  console.log("Say back is done");
 });
 
-$("form").submit(e => {
+$("form").submit((e) => {
   e.preventDefault();
   socket.emit("chat mes", {
     name: $("#name").val(),
-    msg: Encryptor.encrypt($("#message").val(), ValidKey, iv)
+    msg: Encryptor.encrypt($("#message").val(), ValidKey, iv),
   }); //Отправка сообщений на сервер
   $("#all_mess").append(
     `<div class='alert'> <b> ${$("#name").val()} </b> : ${$(
@@ -33128,7 +33176,7 @@ $("form").submit(e => {
   return false;
 });
 
-socket.on("chat message", Message => {
+socket.on("chat message", (Message) => {
   $("#all_mess").append(
     `<div class='alert'> <b>${Message.name} </b> : ${Encryptor.decrypt(
       Message.msg,
