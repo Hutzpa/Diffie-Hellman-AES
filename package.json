@@ -10,7 +10,7 @@
     "mongoose": "^5.9.5",
     "socket.io": "^2.3.0",
     "underscore": "^1.9.2",
-    "ws": "^7.2.3"
+    "ws": "^7.4.6"
   },
   "devDependencies": {
     "browserify": "^16.5.0"
